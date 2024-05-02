@@ -1,0 +1,46 @@
+# Python
+*.pyc
+*.pyo
+__pycache__/
+
+# SimPy
+.env
+.env.bak
+.env.*.bak
+.env.bak.*
+.env.tmp
+.env~*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Logs
+*.log
+logs/
+
+# Dependency directories
+venv/
+env/
+env.bak/
+env.tmp/
+env~*/
+env.local/
+env.development.local/
+env.test.local/
+env.production.local/
+
+# Compiled files
+*.pyd
+*.so
+*.dll
+*.exe
+
+# Miscellaneous
+.DS_Store
+Thumbs.db
