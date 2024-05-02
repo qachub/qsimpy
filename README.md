@@ -13,16 +13,38 @@ QSimPy is a Python-based discrete-event simulation framework designed to address
 - **Extensible and Compatible**: The framework is designed with extensibility, compatibility, and reusability in mind, making it a versatile tool for academic researches in the domain of quantum cloud computing. Users can extend and integrate QSimPy with other Python-based libraries and frameworks for quantum computing and machine learning to adapt with the requirements as needed.
 
 ## Getting Started
-
+### Installation
 To get started with QSimPy, clone this repository and follow the installation instructions below. 
 
 1. Clone the repository: `git clone https://github.com/QuantumAICloud/qsimpy.git`
 2. Change to the project directory: `cd qsimpy`
 3. Install the required dependencies: `pip install -r requirements.txt`
 
+### Example of usage
 Explore our examples to see how QSimPy can be utilized to model different scenarios and optimize resource allocation in a simulated quantum cloud environment.
+#### Manual modeling and simulation
+QSimPy can be used as a standalone package for creating and testing a quantum cloud scenarios by importing the following code:
+```
+from qsimpy import Broker, QTask, QNode, Dataset
+```
+Then, user can create different objects to model the quantum cloud environment. Two main objects in QSimPy are QNode (quantum computing system) and QTask (quantum computation task). Each object has different attributes, defined in corresponding files. These objects can also be modeled based on all features of quantum circuits (from QASM files) for QTasks, and quantum system calibration data and system models for QNodes.
 
-All contributions to enhance QSimPy further are welcome. For technical documentation, and usage examples, please refer to our paper.
+#### Synthetic datasets for QTasks and QNodes
+We provided several quantum circuit datasets with all features extracted from the [MQTBench dataset](https://www.cda.cit.tum.de/mqtbench/) at the `qdataset` folder. Each CSV file contains different subset of quantum tasks, indicated in the file name as `qsimpyds_<number of subset>_sub_<number of QTask in each subset>`. These datasets can be used to model the dynamics of the continuous incoming workload of the quantum cloud environment. For modeling quantum tasks and quantum nodes, different attributes have been considered as follows:
+
+<img src="figures/fig03-modeling.png" width="400">
+
+
+#### Using QSimPy with Gymnasium
+We provide example of itegrating QSimPy within Gymasium in `gymenv_qsimpy.py` file. In this example, we show how to model 5 different QNodes, using the IBM Quantum system models and use a synthetic quantum tasks dataset to simulate the continuous workload of the quantum cloud environment.
+Then, we implemented a simple Deep Q Network using [Ray Rllib](https://docs.ray.io/en/latest/rllib/index.html) with example provided in `ray_train_dqn.py` file. Experiment results will be saved to `/results` folder and can be visualised using Tensorboard.
+![Sample experiment results on Tensorboard](figures/fig07_tb.png "Sample RL Training results on Tensorboard")
+
+For technical documentation, and more details in usage examples, please refer to our paper.
+
+> [!NOTE]  
+> This is the proof-of-concept implementation of QSimPy toolkit and we're working to improve it further to support more comprehensive quantum cloud computing scenarios. All constructive contributions to enhance QSimPy from the community are welcome. For users, who are familar with Java and CloudSim-based simulation, we suggest to checkout our related work on [iQuantum](https://github.com/Cloudslab/iQuantum).
+
 
 ## Reference
 If you used this package or framework for your research, please kindly cite the following reference:
