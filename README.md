@@ -49,7 +49,7 @@ For technical documentation and more details in usage examples, please take a lo
 ## Reference
 If you used this package or framework for your research, please kindly cite the following reference:
 
-[1] Hoa T. Nguyen, Muhammad Usman, and Rajkumar Buyya, “QSimPy: A Learning-centric Simulation Framework for Quantum Cloud Resource Management”, 2024, arXiv:2405.01021
+[1] Hoa T. Nguyen, Muhammad Usman, and Rajkumar Buyya, [“QSimPy: A Learning-centric Simulation Framework for Quantum Cloud Resource Management”](https://arxiv.org/abs/2405.01021), 2024, arXiv:2405.01021
 
 ### BibTex
 ```
