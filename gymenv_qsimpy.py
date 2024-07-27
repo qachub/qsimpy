@@ -16,99 +16,98 @@ import simpy
 class QSimPyEnv(gym.Env):
     MAX_ROUNDS = 999  # maximum number of rounds in the QTask dataset
 
-    class GymEnvQSimPy:
+    """
+    Gym environment for QSimPy.
+
+    Args:
+        config (dict): Configuration parameters for the environment.
+        dataset (str): Path to the QTask dataset.
+
+    Attributes:
+        n_qtasks (int): Number of qtasks.
+        n_qnodes (int): Number of qnodes.
+        qtasks (list): List of qtasks.
+        qnodes (list): List of qnodes.
+        obs_dim (int): Dimension of the observation space.
+        observation_space (gym.spaces.Box): Observation space.
+        action_space (gym.spaces.Discrete): Action space.
+        qtask_dataset (Dataset): QTasks dataset.
+        rng (numpy.random.Generator): Random number generator.
+        qsp_env (simpy.Environment): QSimPy environment.
+        round (int): Current round.
+        seed (int): Seed for the random number generator.
+    """
+
+    def __init__(
+        self,
+        config=None,
+        dataset=None,
+    ):
         """
-        Gym environment for QSimPy.
+        Initialize the GymEnvQSimPy class.
 
         Args:
             config (dict): Configuration parameters for the environment.
-            dataset (str): Path to the QTask dataset.
-
-        Attributes:
-            n_qtasks (int): Number of qtasks.
-            n_qnodes (int): Number of qnodes.
-            qtasks (list): List of qtasks.
-            qnodes (list): List of qnodes.
-            obs_dim (int): Dimension of the observation space.
-            observation_space (gym.spaces.Box): Observation space.
-            action_space (gym.spaces.Discrete): Action space.
-            qtask_dataset (Dataset): QTasks dataset.
-            rng (numpy.random.Generator): Random number generator.
-            qsp_env (simpy.Environment): QSimPy environment.
-            round (int): Current round.
-            seed (int): Seed for the random number generator.
+            dataset (str): Path to the dataset.
         """
+        
+        super().__init__()
 
-        def __init__(
-            self,
-            config=None,
-            dataset=None,
-        ):
-            """
-            Initialize the GymEnvQSimPy class.
+        # OBSERVATION SPACE
+        # Each observation is a dict of qtask_attributes and qnode_attributes
+        # QTask attrributes = [arrivaltime, qt_qubits, cl]
+        # QNode attributes = [qn_qubits, d1cps, next_available_time]
+        self.n_qtasks = 25
+        self.n_qnodes = 5  # number of qnodes
+        self.qtasks = []
+        self.qnodes = []
 
-            Args:
-                config (dict): Configuration parameters for the environment.
-                dataset (str): Path to the dataset.
-            """
-            
-            super().__init__()
+        self.obs_dim = 4 + self.n_qnodes * 3
+        self.observation_space = Box(
+            low=np.ones((self.obs_dim,), dtype=np.float32) * -np.inf,
+            high=np.ones((self.obs_dim,), dtype=np.float32) * np.inf,
+            dtype=np.float32,
+        )
+        # Example max values for each type of observation
+        max_time = 10000000  # Max next availble time
+        max_qubits = 500  # Max number of qubits
+        max_layers = 1000000  # Max number of layers in a circuit
+        max_clops = 10000  # Max computational load
+        max_rescheduling_count = 1000  # Max number of rescheduling
 
-            # OBSERVATION SPACE
-            # Each observation is a dict of qtask_attributes and qnode_attributes
-            # QTask attrributes = [arrivaltime, qt_qubits, cl]
-            # QNode attributes = [qn_qubits, d1cps, next_available_time]
-            self.n_qtasks = 25
-            self.n_qnodes = 5  # number of qnodes
-            self.qtasks = []
-            self.qnodes = []
+        # Assuming the observation consists of [arrival_time, qubit_number, circuit_layers] for tasks
+        # and [qubit_number, clops, next_available_time] for each node
+        task_obs_low = np.array([0, 0, 0, 0], dtype=np.float64)
+        task_obs_high = np.array(
+            [max_time, max_qubits, max_layers, max_rescheduling_count], dtype=np.float64
+        )
+        node_obs_low = np.array([0, 0, -1] * self.n_qnodes, dtype=np.float64)
+        node_obs_high = np.array(
+            [max_qubits, max_clops, max_time] * self.n_qnodes, dtype=np.float64
+        )
 
-            self.obs_dim = 4 + self.n_qnodes * 3
-            self.observation_space = Box(
-                low=np.ones((self.obs_dim,), dtype=np.float32) * -np.inf,
-                high=np.ones((self.obs_dim,), dtype=np.float32) * np.inf,
-                dtype=np.float32,
-            )
-            # Example max values for each type of observation
-            max_time = 10000000  # Max next availble time
-            max_qubits = 500  # Max number of qubits
-            max_layers = 1000000  # Max number of layers in a circuit
-            max_clops = 10000  # Max computational load
-            max_rescheduling_count = 1000  # Max number of rescheduling
+        # Combine to form the complete observation space
+        obs_low = np.concatenate([task_obs_low, node_obs_low]).astype(np.float64)
+        obs_high = np.concatenate([task_obs_high, node_obs_high]).astype(np.float64)
 
-            # Assuming the observation consists of [arrival_time, qubit_number, circuit_layers] for tasks
-            # and [qubit_number, clops, next_available_time] for each node
-            task_obs_low = np.array([0, 0, 0, 0], dtype=np.float64)
-            task_obs_high = np.array(
-                [max_time, max_qubits, max_layers, max_rescheduling_count], dtype=np.float64
-            )
-            node_obs_low = np.array([0, 0, -1] * self.n_qnodes, dtype=np.float64)
-            node_obs_high = np.array(
-                [max_qubits, max_clops, max_time] * self.n_qnodes, dtype=np.float64
-            )
+        self.observation_space = Box(low=obs_low, high=obs_high, dtype=np.float64)
+        self.current_obs = None
 
-            # Combine to form the complete observation space
-            obs_low = np.concatenate([task_obs_low, node_obs_low]).astype(np.float64)
-            obs_high = np.concatenate([task_obs_high, node_obs_high]).astype(np.float64)
+        # ACTION SPACE
+        self.action_space = Discrete(self.n_qnodes)
 
-            self.observation_space = Box(low=obs_low, high=obs_high, dtype=np.float64)
-            self.current_obs = None
+        # Load QTasks dataset
+        if dataset is None:
+            raise ValueError("Dataset is not specified")
+        self.qtask_dataset = Dataset(dataset)
+        self.rng = default_rng(seed=22)
+        # QSimPy environment
+        self.qsp_env = simpy.Environment()
+        self.setup_quantum_resources()
 
-            # ACTION SPACE
-            self.action_space = Discrete(self.n_qnodes)
-
-            # Load QTasks dataset
-            if dataset is None:
-                raise ValueError("Dataset is not specified")
-            self.qtask_dataset = Dataset(dataset)
-            self.rng = default_rng(seed=22)
-            # QSimPy environment
-            self.qsp_env = simpy.Environment()
-            self.setup_quantum_resources()
-
-            # Round
-            self.round = 1
-            self.seed = 22
+        # Round
+        self.round = 1
+        self.seed = 22
 
     def _get_obs(self):
         """

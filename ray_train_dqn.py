@@ -3,7 +3,7 @@ import argparse
 import ray
 from ray import tune, air, train
 from ray.tune.registry import register_env
-from env_creator import qsimpy_qce_env_creator
+from env_creator import qsimpy_env_creator
 from ray.rllib.algorithms.dqn import DQNConfig
 from ray.rllib.utils.framework import try_import_tf
 from ray.tune.analysis import ExperimentAnalysis
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     # ray.init(num_cpus=args.num_cpus or None)
 
-    register_env("QSimPyEnv", qsimpy_qce_env_creator)
+    register_env("QSimPyEnv", qsimpy_env_creator)
 
     replay_config = {
         "type": "MultiAgentPrioritizedReplayBuffer",
