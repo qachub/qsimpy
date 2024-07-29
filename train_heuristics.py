@@ -15,16 +15,19 @@ class HeuristicSolutions:
 
     def run(self, control):
         self.results = []
-        self.env.setup_quantum_resources()
         self.env.round = 1
         for _ in range(self.num_episodes):
+
             arr_temp = {
                 "total_completion_time": 0.0,
                 "rescheduling_count": 0.0
             }
             terminated = False
+            
             self.env.reset()
+            self.env.setup_quantum_resources()
             self.rr_index = 0
+
             while not terminated:
                 if control == "greedy":
                     action = self.greedy(self.greedy_index)
