@@ -7,28 +7,45 @@ import matplotlib.ticker as mticker
 
 class HeuristicSolutions:
     def __init__(self, env, num_episodes=100):
+
+        # Initialize the environment
         self.env = env
         self.num_episodes = num_episodes
+
+        # Initialize the results of heuristic solutions
         self.results = []
+        # Round Robin index for the QNodes. Example: [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, ...]
         self.rr_index = 0
+        # Priority index of Greedy solution after sorting the QNodes based on the waiting time
         self.greedy_index = 0
 
     def run(self, control):
+        """
+        Run the heuristic solutions for the given algorithm (control).
+        Args:
+            - control (str): The heuristic algorithm to use. Options: "greedy", "random", "round_robin".
+        """
+
         self.results = []
+        # Reset the subset of QTasks 
         self.env.round = 1
+
         for _ in range(self.num_episodes):
 
+            # Initialize the temporary array to store the results of the QTasks execution for each episode
             arr_temp = {
                 "total_completion_time": 0.0,
                 "rescheduling_count": 0.0
             }
             terminated = False
-            
+
+            # Reset the environment and setup the quantum resources
             self.env.reset()
             self.env.setup_quantum_resources()
             self.rr_index = 0
 
             while not terminated:
+                # Get the action with the given control
                 if control == "greedy":
                     action = self.greedy(self.greedy_index)
                 elif control == "random":
@@ -37,6 +54,7 @@ class HeuristicSolutions:
                     action = self.round_robin()
                 obs, reward, terminated, done, info = self.env.step(action)
                 
+                # If the QNode is busy or not satisfied, move to the next priority QNode
                 self.greedy_index += 1
                 if reward > 0:
                     """Get the results of the QTask execution
@@ -45,23 +63,30 @@ class HeuristicSolutions:
                         - Total Completion Time: waiting_time + execution_time
                         - Rescheduling Count: rescheduling_count
                     """
+                    # Reset priority index of Greedy solution if QTasks are satisfied
                     self.greedy_index = 0
 
                     arr_temp["total_completion_time"] += info["scheduled_qtask"].waiting_time + info["scheduled_qtask"].execution_time
                     arr_temp["rescheduling_count"] += info["scheduled_qtask"].rescheduling_count
 
+            # Final results of the episode
             self.results.append(arr_temp)
+
+        # Save the results to a CSV file
         self._save_to_csv(control)
                 
     def greedy(self, greedy_index):
+        # Sort the QNodes based on the next available time (or waiting time) and select the QNode with the smallest waiting time
         greedy_strategy = sorted(self.env.qnodes, key=lambda x: x.next_available_time)
         return self.env.qnodes.index(greedy_strategy[greedy_index])
 
     def random(self):
+        # Randomly select a QNode
         action = self.env.action_space.sample()
         return action
     
     def round_robin(self):
+        # Select the QNode based on the Round Robin index
         action = self.rr_index % self.env.n_qnodes
         self.rr_index += 1
         return action
@@ -103,7 +128,7 @@ class HeuristicSolutions:
         plt.ylabel('Total Completion Time')
         plt.xlabel('Evaluation Episode')
         plt.legend(loc=2)
-        plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
+        plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(10))
         plt.show()
 
     def _sumerize_results(self, values, label) -> None:
@@ -117,6 +142,8 @@ class HeuristicSolutions:
 
 
 if __name__ == "__main__":
+
+    # Create the QSimPy environment
     env_config={
                 "obs_filter": "rescale_-1_1",
                 "reward_filter": None,
@@ -124,10 +151,14 @@ if __name__ == "__main__":
             }
 
     env = qsimpy_env_creator(env_config)
+
+    # Run the heuristic solutions
     heuristics = HeuristicSolutions(env, num_episodes=100)
     heuristics.run("greedy")
     heuristics.run("random")
     heuristics.run("round_robin")
+
+    # Plot the results
     paths = [
         {
             "label": "random",
@@ -142,7 +173,7 @@ if __name__ == "__main__":
         {
             "label": "greedy",
             "path": "./results/heuristics/greedy.csv",
-            "color": "yellow"
+            "color": "black"
         },
     ]
     heuristics._plot_results(paths)
