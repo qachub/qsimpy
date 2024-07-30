@@ -44,7 +44,7 @@ class QSimPyEnv(gym.Env):
         dataset=None,
     ):
         """
-        Initialize the QSimPyEnv class.
+        Initialize the GymEnvQSimPy class.
 
         Args:
             config (dict): Configuration parameters for the environment.
@@ -251,8 +251,6 @@ class QSimPyEnv(gym.Env):
         )
         reward = 1/time_reward
 
-        scheduled_qtask = self.current_qtask
-
         # Get the next observation
         # Check if there are more qtasks, if yes, get the next qtask, otherwise set terminated to True
         if len(self.qtasks) > 0:
@@ -264,7 +262,7 @@ class QSimPyEnv(gym.Env):
 
         self.current_obs = self._get_obs()
 
-        return self.current_obs, reward, terminated, False, {"scheduled_qtask": scheduled_qtask}
+        return self.current_obs, reward, terminated, False, {}
 
     def close(self):
         pass
