@@ -3,7 +3,8 @@ matplotlib==3.8.3
 matplotlib-inline==0.1.6
 numpy==1.26.4
 pandas==2.2.0
-qiskit==0.46.0
+qiskit==1.2.0
+qiskit_qasm3_import
 qiskit-terra==0.46.0
 ray==2.9.3
 ray[tune,air,train,rllib]

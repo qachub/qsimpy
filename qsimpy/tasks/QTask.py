@@ -1,6 +1,5 @@
 from .TaskStatus import TaskStatus
-from qiskit import QuantumCircuit
-
+import qiskit
 
 class QTask:
     """
@@ -36,7 +35,7 @@ class QTask:
 
         # If qasm_file is provided, extract features from it
         if qasm_file is not None:
-            self.circuit = QuantumCircuit.from_qasm_file(qasm_file)
+            self.circuit = qiskit.qasm3.load(qasm_file)
             self.qubit_number = self.circuit.num_qubits
             self.circuit_layers = self.circuit.depth()
             self.gate_counts = self.circuit.count_ops()
