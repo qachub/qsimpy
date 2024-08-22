@@ -9,7 +9,7 @@ import gymnasium as gym
 from gymnasium.spaces import Box, Discrete
 import numpy as np
 from numpy.random import default_rng
-from qsimpy import Broker, QTask, TaskStatus, IBMQNode, Dataset
+from qsimpy import Broker, QTask, TaskStatus, IBMQNode, Dataset, Log
 import simpy
 
 
@@ -22,6 +22,7 @@ class QSimPyEnv(gym.Env):
     Args:
         config (dict): Configuration parameters for the environment.
         dataset (str): Path to the QTask dataset.
+        mode (str): Selection for simulation/emulation mode.
 
     Attributes:
         n_qtasks (int): Number of qtasks.
@@ -42,6 +43,7 @@ class QSimPyEnv(gym.Env):
         self,
         config=None,
         dataset=None,
+        mode="simulate"
     ):
         """
         Initialize the QSimPyEnv class.
@@ -61,7 +63,7 @@ class QSimPyEnv(gym.Env):
         self.n_qnodes = 5  # number of qnodes
         self.qtasks = []
         self.qnodes = []
-
+        self.mode = mode
         self.obs_dim = 4 + self.n_qnodes * 3
         self.observation_space = Box(
             low=np.ones((self.obs_dim,), dtype=np.float32) * -np.inf,
@@ -69,7 +71,7 @@ class QSimPyEnv(gym.Env):
             dtype=np.float32,
         )
         # Example max values for each type of observation
-        max_time = 10000000  # Max next availble time
+        max_time = 10000000  # Max next available time
         max_qubits = 500  # Max number of qubits
         max_layers = 1000000  # Max number of layers in a circuit
         max_clops = 10000  # Max computational load
@@ -108,6 +110,8 @@ class QSimPyEnv(gym.Env):
         # Round
         self.round = 1
         self.seed = 22
+        self.round_robin_index = 0
+        self.results = [] 
 
     def _get_obs(self):
         """
@@ -166,7 +170,7 @@ class QSimPyEnv(gym.Env):
         ]
 
         # Create a Broker
-        self.broker = Broker(self.qsp_env, self.qnodes)
+        self.broker = Broker(self.qsp_env, self.qnodes, self.mode)
 
     def generate_qtasks(self):
         """Generate a list of QTasks from the QTask dataset, following Poisson distribution of arrival time."""
@@ -202,8 +206,11 @@ class QSimPyEnv(gym.Env):
             self.current_qtask = self.qtasks.pop(0)
         self.round += 1
 
-    def submit_task_to_qnode(self, qtask, qnode_id):
+    def submit_task_to_qnode(self, qtask, qnode_id=None):
         reward = 0
+        if qnode_id is None:
+            qnode_id = self.round_robin_index % self.n_qnodes
+            self.round_robin_index += 1
         qtask, waiting_time, execution_time = self.broker.preprocess_qtask(
             qtask, self.qnodes[qnode_id]
         )
@@ -231,6 +238,13 @@ class QSimPyEnv(gym.Env):
         self.qsp_env.process(qtask_execution)
         # print(f"Estimated waiting time: {waiting_time}")
         # print(f"Estimated execution time: {execution_time}")
+        self.results.append({
+            'qtask_id': qtask.id,
+            'qnode_id': qnode_id,
+            'waiting_time': waiting_time,
+            'execution_time': execution_time,
+            'rescheduling_count': qtask.rescheduling_count,  # Store the actual count from the task
+        })
         reward = waiting_time + execution_time
         return reward, qtask.rescheduling_count
 
@@ -240,6 +254,31 @@ class QSimPyEnv(gym.Env):
         self.current_obs = self._get_obs().astype(np.float32)
         info = {}
         return self.current_obs, info
+    
+    def collect_results(self):
+        Log.print_simulation_results(self.qnodes)
+        """Collect and summarize results from the QTask executions."""
+        total_qtasks = len(self.results)
+        total_waiting_time = sum(result['waiting_time'] for result in self.results)
+        total_execution_time = sum(result['execution_time'] for result in self.results)
+        total_rescheduling_count = sum(result['rescheduling_count'] for result in self.results)
+
+        if total_qtasks > 0:
+            avg_waiting_time = total_waiting_time / total_qtasks
+            avg_execution_time = total_execution_time / total_qtasks
+            avg_rescheduling_count = total_rescheduling_count / total_qtasks
+        else:
+            avg_waiting_time = avg_execution_time = avg_rescheduling_count = 0
+
+        summary = {
+            'total_qtasks': total_qtasks,
+            'total_waiting_time': total_waiting_time,
+            'total_execution_time': total_execution_time,
+            'avg_waiting_time': avg_waiting_time,
+            'avg_execution_time': avg_execution_time,
+            'avg_rescheduling_count': avg_rescheduling_count,
+        }
+        return summary
 
     def step(self, action):
         # Submit the current qtask to the selected qnode

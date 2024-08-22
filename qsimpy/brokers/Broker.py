@@ -12,9 +12,10 @@ class Broker:
         - qnodes (list): The list of quantum nodes that the broker can assign quantum tasks to.
     """
 
-    def __init__(self, env, qnodes):
+    def __init__(self, env, qnodes, mode):
         self.env = env
         self.qnodes = qnodes
+        self.mode=mode
 
     def time_until_task_arrival(self, qtask):
         """Return the time until the task's arrival time."""
@@ -43,10 +44,10 @@ class Broker:
         else:
             # If qiskit_backend is set, transpile the task
             if qnode.qiskit_backend:
-                qtask.circuit_layers = qnode.transpile_task(qtask)
+                qtask.circuit_layers = qnode.transpile_task(qtask,self.mode)
             # Get estimated waiting time and execution time
-            estimated_waiting_time = qnode.get_estimated_waiting_time(qtask)
-            estimated_execution_time = qnode.get_estimated_execution_time(qtask)
+            estimated_waiting_time = qnode.get_estimated_waiting_time(qtask,self.mode)
+            estimated_execution_time = qnode.get_estimated_execution_time(qtask,self.mode)
             qtask.waiting_time = estimated_waiting_time
             qtask.execution_time = estimated_execution_time
         return qtask, estimated_waiting_time, estimated_execution_time
