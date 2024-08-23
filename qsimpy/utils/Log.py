@@ -69,6 +69,8 @@ class Log:
             # Print the sorted tasks
             for qtask in sorted_tasks:
                 wall_time = qtask.waiting_time + qtask.execution_time
+                qtask.start_running_time=qtask.arrival_time+qtask.waiting_time
+                qtask.finish_time=qtask.start_running_time+qtask.execution_time
                 print(
                     f" {qtask.id:^8} | {qtask.qnode.id:^5} | {round(qtask.arrival_time, 4):^12.4f} | {round(qtask.waiting_time, 4):^12.4f} | {round(qtask.start_running_time, 4):^12.4f} |  {round(qtask.execution_time, 4):^14.4f} | {round(wall_time, 4):^11.4f} | {round(qtask.finish_time, 4):^11.4f} "
                 )
@@ -96,6 +98,7 @@ class Log:
             print(f"Total Wall Time: {round(total_wall_time, 2)}")
             print("QNode Relative Utilizations based on Share of Work:")
             for qnode in qnodeList:
+                qnode.total_busy_time=sum(task.execution_time for task in qnode.completed_tasks)
                 relative_utilization = qnode.total_busy_time / total_execution_time
                 print(f"- QNode {qnode.id}: {relative_utilization:.2%}")
         else:

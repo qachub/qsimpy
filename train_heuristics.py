@@ -23,7 +23,7 @@ class HeuristicSolutions:
         """
         Run the heuristic solutions for the given algorithm (control).
         Args:
-            - control (str): The heuristic algorithm to use. Options: "greedy", "random", "round_robin".
+            - control (str): The heuristic algorithm to use. Options: "greedy", "random", "round_robin", "greedy_error"
         """
 
         self.results = []
@@ -52,6 +52,9 @@ class HeuristicSolutions:
                     action = self.random()
                 elif control == "round_robin":
                     action = self.round_robin()
+                elif control == "greedy_error":
+                    action = self.greedy_error(self.greedy_index)
+                
                 obs, reward, terminated, done, info = self.env.step(action)
                 
                 # If the QNode is busy or not satisfied, move to the next priority QNode
@@ -68,7 +71,7 @@ class HeuristicSolutions:
 
                     arr_temp["total_completion_time"] += info["scheduled_qtask"].waiting_time + info["scheduled_qtask"].execution_time
                     arr_temp["rescheduling_count"] += info["scheduled_qtask"].rescheduling_count
-
+            self.env.qsp_env.run()
             # Final results of the episode
             self.results.append(arr_temp)
 
@@ -90,6 +93,13 @@ class HeuristicSolutions:
         action = self.rr_index % self.env.n_qnodes
         self.rr_index += 1
         return action
+    
+    def greedy_error(self, greedy_index, g_error="Readout_assignment_error"):
+        # Sort the QNodes based on the next available time (or waiting time) and select the QNode with the 
+        # smallest waiting time and smallest error (default is readout_error) in the qnode
+    
+        greedy_strategy = sorted(self.env.qnodes, key=lambda x: (x.next_available_time, x.error[g_error]))
+        return self.env.qnodes.index(greedy_strategy[greedy_index])
 
     def _save_to_csv(self, control) -> None:
         """
@@ -123,7 +133,7 @@ class HeuristicSolutions:
 
             plt.plot(df1['Episode'], df1['Total Completion Time'], ".-", color=path['color'], label=path['label'])
 
-            self._sumerize_results(df1, path['label'])
+            self._summarize_results(df1, path['label'])
         
         plt.ylabel('Total Completion Time')
         plt.xlabel('Evaluation Episode')
@@ -131,13 +141,13 @@ class HeuristicSolutions:
         plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(10))
         plt.show()
 
-    def _sumerize_results(self, values, label) -> None:
+    def _summarize_results(self, values, label) -> None:
         """
         Summarize the results of the episodes.
         """
         print("Results Summary for" + label + "solution:")
         print(f"Number of Episodes: {self.num_episodes}")
-        print(f"Total Waiting Time: {sum(values['Total Completion Time'])}")
+        print(f"Total Completion Time: {sum(values['Total Completion Time'])}")
         print(f"Average Rescheduling Count: {sum(values['Rescheduling Count']) / self.num_episodes}")
 
 
@@ -157,6 +167,7 @@ if __name__ == "__main__":
     heuristics.run("greedy")
     heuristics.run("random")
     heuristics.run("round_robin")
+    heuristics.run("greedy_error")
 
     # Plot the results
     paths = [
@@ -175,5 +186,11 @@ if __name__ == "__main__":
             "path": "./results/heuristics/greedy.csv",
             "color": "black"
         },
+        {
+            "label": "greedy_error",
+            "path": "./results/heuristics/greedy_error.csv",
+            "color": "green"
+        },
+
     ]
     heuristics._plot_results(paths)

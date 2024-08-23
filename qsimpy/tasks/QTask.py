@@ -38,8 +38,9 @@ class QTask:
             self.circuit = qiskit.qasm3.load(qasm_file)
             self.qubit_number = self.circuit.num_qubits
             self.circuit_layers = self.circuit.depth()
-            self.gate_counts = self.circuit.count_ops()
-        elif qtask_data is not None:
+            self.gate_counts = self.circuit.count_ops()    
+
+        if qtask_data is not None:
             # Extract features from qtask_data
             self.qtask_data = qtask_data
             self.circuit = None

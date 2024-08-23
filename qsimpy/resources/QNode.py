@@ -1,10 +1,12 @@
 import simpy
+import os
+import re
 from simpy.core import Environment
 from qsimpy.utils.Log import Log
 from qsimpy.tasks.TaskStatus import TaskStatus
 from typing import Optional
-from qiskit import transpile
-
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+from qiskit import QuantumCircuit
 
 class QNode(simpy.Resource):
     """A quantum node that can execute quantum tasks. This class inherits from simpy.Resource.
@@ -27,6 +29,7 @@ class QNode(simpy.Resource):
         quantum_volume: Optional[int] = None,
         clops: Optional[int] = None,
         capacity=1,
+        error:Optional[dict] = None
     ):
         """
         Initialize a quantum node.
@@ -37,6 +40,7 @@ class QNode(simpy.Resource):
             - quantum_volume (int): The quantum volume of the quantum node.
             - clops (int): The clops rating of the quantum node.
             - capacity (int): The maximum number of tasks that can be executed on the quantum node simultaneously.
+            - error (dict): The different error rates of the quantum node
 
         """
         super().__init__(env, capacity=capacity)
@@ -59,6 +63,7 @@ class QNode(simpy.Resource):
         self.qiskit_backend = None
         self.qnode_name = None
         self.qnode_model = None
+        self.error = error
 
     def request(self, task=None):
         """
@@ -106,26 +111,72 @@ class QNode(simpy.Resource):
         )
         self.completed_tasks.append(task)
 
-    def transpile_task(self, task):
+    def simulate_task(self, task):
+        transpiled_cl = task.qtask_data[self.qnode_model]["depth"]  # TODO: + 100k just for testing, remove for production
+        Log.print_success(
+            f"🔸 QTask {task.id}: Transpiling circuit from {task.circuit_layers} layer to {transpiled_cl} layers to adapt with {self.qnode_name} backend ({self.qubit_number} qubits, CLOPS {self.clops})",
+        )
+        self.completed_tasks.append(task)
+        task.set_status(TaskStatus.DONE)
+        return transpiled_cl
+
+    def emulate_task(self, task):
+        algo = task.qtask_data["algorithm"]
+        qubit = task.qubit_number
+        pattern = rf"{algo}_indep_qiskit_{qubit}"  # Regex pattern to match the desired files
+        folder = "./qdataset/qasm/all"  # Folder where QASM files are located
+        file_list = os.listdir(folder)  # List all files in the folder
+        task.set_status(TaskStatus.VALIDATING)  # Set task status to VALIDATING
+        # Initialize the transpiler with the specified backend and options
+        pm_sim = generate_preset_pass_manager(backend=self.qiskit_backend, optimization_level=0)
+        qasm_path = None  # Initialize qasm_path to None
+
+        # Loop through the sorted list of files in the folder
+        for file_name in sorted(file_list):
+            if file_name.endswith(".qasm"):
+                match = re.search(pattern, file_name)  # Search for the pattern in the filename
+                if match:
+                    qasm_path = os.path.join(folder, file_name)  # If a match is found, set qasm_path
+                    break  # Break the loop once a valid QASM file is found
+
+        # Check if a valid QASM file was found
+        if qasm_path:
+            task.qasm_file = qasm_path
+            # Create a QuantumCircuit object from the QASM file
+            circuit = QuantumCircuit.from_qasm_file(task.qasm_file)
+            # Update the task's circuit attribute
+            task.circuit = circuit
+            # Transpile the circuit for the specified backend
+            transpiled_circuit= pm_sim.run(task.circuit)
+            # Update the task with the transpiled circuit and its layers
+            transpiled_cl, _ = task.update_transpiled_circuit(transpiled_circuit)
+            task.execution_time=(task.get_circuit_layers() / self.d1cps) * task.shots
+            # Log the success of the transpiling process
+            Log.print_success(
+                f"🔸 QTask {task.id}: Transpiling circuit from {task.circuit_layers} layer to {transpiled_cl} layers to adapt with {self.qnode_name} backend ({self.qubit_number} qubits, CLOPS {self.clops}, Execution Time:{task.execution_time})"
+            )
+            self.completed_tasks.append(task)
+            task.set_status(TaskStatus.DONE)
+            return transpiled_cl
+        else:
+            # Handle the case where no valid QASM file was found
+            Log.print_error(f"No matching QASM file found for task {task.id}")
+            task.set_status(TaskStatus.ERROR)
+            return None
+
+    def transpile_task(self, task, mode: str):
         """
         Transpile a quantum task directly using QASM file or used pre-transpiled data from qtask_data
         """
-        if task.circuit is not None:
-            task.set_status(TaskStatus.VALIDATING)
-            transpiled_circuit = transpile(task.circuit, backend=self.qiskit_backend)
-            transpiled_cl, _ = task.update_transpiled_circuit(transpiled_circuit)
-            Log.print_success(
-                f"🔸 QTask {task.id}: Transpiling circuit from {task.circuit_layers} layer to {transpiled_cl} layers to adapt with {self.qnode_name} backend ({self.qubit_number} qubits, CLOPS {self.clops})",
-            )
-        elif self.qnode_model is not None:
-            # Extract transpiled circuit layer from qtask_data
-            transpiled_cl = task.qtask_data[self.qnode_model][
-                "depth"
-            ]  # TODO: + 100k just for testing, remove for production
-            Log.print_success(
-                f"🔸 QTask {task.id}: Transpiling circuit from {task.circuit_layers} layer to {transpiled_cl} layers to adapt with {self.qnode_name} backend ({self.qubit_number} qubits, CLOPS {self.clops})",
-            )
-        return transpiled_cl
+        if mode == "emulate":
+            return self.emulate_task(task)
+        elif mode == "simulate":
+            if self.qnode_model is not None:
+                return self.simulate_task(task)
+            else:
+                raise ValueError("QNode model is None")
+        else:
+            raise ValueError("Invalid mode. Choose 'emulate' or 'simulate'.")
 
     def get_waiting_queue_ids(self):
         """Get the IDs of tasks in the waiting queue."""
@@ -135,23 +186,26 @@ class QNode(simpy.Resource):
         """Get the quantum tasks in the waiting queue."""
         waiting_queue = []
         for task in self.waiting_tasks:
-            execution_time = self.get_estimated_execution_time(task)
+            execution_time = self.get_estimated_execution_time(task,self.mode)
             waiting_queue.append((task.id, execution_time))
         return waiting_queue
 
-    def get_estimated_execution_time(self, task):
+    def get_estimated_execution_time(self, task, mode="simulate"):
         """Get the estimated execution time for a task."""
-        return (task.get_circuit_layers() / self.d1cps) * task.shots
+        if mode=="simulate":
+            return (task.get_circuit_layers() / self.d1cps) * task.shots
+        elif mode=="emulate":
+            return task.execution_time
 
-    def get_estimated_waiting_time(self, qtask):
+    def get_estimated_waiting_time(self, qtask, mode="simulate"):
         """Get the estimated waiting time for the quantum node."""
         if self.next_available_time > qtask.arrival_time:
             estimated_waiting_time = self.next_available_time - qtask.arrival_time
-            self.next_available_time += self.get_estimated_execution_time(qtask)
+            self.next_available_time += self.get_estimated_execution_time(qtask,mode)
         else:
             estimated_waiting_time = 0
             self.next_available_time = (
-                qtask.arrival_time + self.get_estimated_execution_time(qtask)
+                qtask.arrival_time + self.get_estimated_execution_time(qtask,mode)
             )
         return estimated_waiting_time
 
