@@ -4,8 +4,7 @@ matplotlib-inline==0.1.6
 numpy==1.26.4
 pandas==2.2.0
 qiskit[visualization]==1.2.0
-qiskit-ibm-runtime
-qiskit==1.2.0
+qiskit-ibm-runtime==0.28.0
 ray==2.9.3
 ray[tune,air,train,rllib]
 scikit-learn==1.4.2
