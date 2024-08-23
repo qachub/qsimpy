@@ -5,10 +5,13 @@ numpy==1.26.4
 pandas==2.2.0
 qiskit[visualization]==1.2.0
 qiskit-ibm-runtime
-ray==2.31.0
+qiskit==1.2.0
+ray==2.9.3
 ray[tune,air,train,rllib]
 scikit-learn==1.4.2
 scipy==1.12.0
 simpy==4.1.1
 tensorboardx==2.6.2.2
-torch
+torch==2.4.0
+pylatexenc==2.10
+qiskit-qasm3-import==0.5.0
