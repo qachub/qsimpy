@@ -55,6 +55,9 @@ class QTask:
             self.circuit_layers = circuit_layers
             self.gate_counts = None
 
+        # Original arrival time
+        self.init_arrival_time = arrival_time
+        # Current arrival time (may change during rescheduling)
         self.arrival_time = arrival_time
         self.status = TaskStatus.INITIALIZING
         self.start_running_time = -1

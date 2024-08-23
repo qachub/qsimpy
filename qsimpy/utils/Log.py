@@ -1,3 +1,7 @@
+import csv
+import os
+from datetime import datetime, timedelta
+
 class Log:
     log = False
 
@@ -103,3 +107,61 @@ class Log:
                 print(f"- QNode {qnode.id}: {relative_utilization:.2%}")
         else:
             pass
+    @staticmethod
+    def export_simulation_results(
+        qnodeList, output_folder="evaluation", output_file="evaluation_result"
+    ):
+        # Create a list of all completed tasks across all QNodes
+        all_completed_tasks = []
+        for qnode in qnodeList:
+            all_completed_tasks.extend(qnode.completed_tasks)
+
+        # Sort the tasks based on their IDs
+        sorted_tasks = sorted(all_completed_tasks, key=lambda x: x.id)
+
+        # Ensure the output folder exists
+        os.makedirs(output_folder, exist_ok=True)
+        # Get the current date and time
+        now = datetime.utcnow() + timedelta(hours=10)  # Convert to AEST
+        timestamp = now.strftime("%d_%m-%H_%M_%S")
+        output_file = output_file + f"_eval_{timestamp}.csv"
+        output_path = os.path.join(output_folder, output_file)
+
+        # Define the header
+        header = [
+            "qtask_id",
+            "qnode",
+            "arrival_time",
+            "schedule_time",
+            "waiting_time",
+            "start_time",
+            "execution_time",
+            "wall_time",
+            "finish_time",
+            "rescheduling_count",
+        ]
+
+        # Write the results to the CSV file
+        with open(output_path, mode="w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(header)
+            for qtask in sorted_tasks:
+                waiting_time = (
+                    qtask.waiting_time + qtask.arrival_time - qtask.init_arrival_time
+                )
+                wall_time = waiting_time + qtask.execution_time
+                writer.writerow(
+                    [
+                        f"{qtask.id:06}",
+                        qtask.qnode.id,
+                        round(qtask.init_arrival_time, 4),
+                        round(qtask.arrival_time, 4),
+                        round(waiting_time, 4),
+                        round(qtask.start_running_time, 4),
+                        round(qtask.execution_time, 4),
+                        round(wall_time, 4),
+                        round(qtask.finish_time, 4),
+                        qtask.rescheduling_count,
+                    ]
+                )
+        print(f"Results exported to {output_path}")

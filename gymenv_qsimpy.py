@@ -112,6 +112,14 @@ class QSimPyEnv(gym.Env):
         self.seed = 22
         self.round_robin_index = 0
         self.results = [] 
+        
+        # Set rescheduling time, default = 0.01s
+        self.rescheduling_time = 0.01
+
+        # Check if evaluation is set
+        self.evaluation = config.get("evaluation", False)
+        self.policy = config.get("policy", "UnknownPolicy")
+        
 
     def _get_obs(self):
         """
@@ -181,13 +189,18 @@ class QSimPyEnv(gym.Env):
 
         # Get QTask from the subset of the dataset
         qtasks = self.qtask_dataset.get_subset_data(self.round)
-
+        
+        # Option 1: Random arrival time of qtasks (original implementation)
         n_qtasks = len(qtasks)  # number of qtasks
         qtask_arrival = self.rng.uniform(
             low=0.1 + self.round * 60, high=59.9 + self.round * 60, size=n_qtasks
         )
         # Set the arrival time of the first qtask to 0
         qtask_arrival.sort()
+        
+        # Option 2: Get arrival time from the datasets
+        # qtask_arrival = [qtask["arrival_time"] for qtask in qtasks.values()]
+
 
         # Extract only the values (dictionaries) from qtasks
         qtask_values = list(qtasks.values())
@@ -204,6 +217,7 @@ class QSimPyEnv(gym.Env):
         # Set current qtask to the first qtask in the list
         if len(self.qtasks) > 0:
             self.current_qtask = self.qtasks.pop(0)
+        self.prev_qtask = None
         self.round += 1
 
     def submit_task_to_qnode(self, qtask, qnode_id=None):
@@ -236,6 +250,9 @@ class QSimPyEnv(gym.Env):
             qtask, self.qnodes[qnode_id]
         )
         self.qsp_env.process(qtask_execution)
+        # Delay time is the time from initial arrival time to the time the task started to be placed in the QNode
+        delay_time = qtask.arrival_time - qtask.init_arrival_time
+        
         # print(f"Estimated waiting time: {waiting_time}")
         # print(f"Estimated execution time: {execution_time}")
         self.results.append({
@@ -245,7 +262,7 @@ class QSimPyEnv(gym.Env):
             'execution_time': execution_time,
             'rescheduling_count': qtask.rescheduling_count,  # Store the actual count from the task
         })
-        reward = waiting_time + execution_time
+        reward = delay_time + waiting_time + execution_time
         return reward, qtask.rescheduling_count
 
     def reset(self, *, seed=None, options=None):
@@ -306,4 +323,11 @@ class QSimPyEnv(gym.Env):
         return self.current_obs, reward, terminated, False, {"scheduled_qtask": scheduled_qtask}
 
     def close(self):
+        # If the evaluation is set, run the environment and export the results
+        if self.evaluation:
+            Log.log = True
+            self.qsp_env.run()
+            Log.print_simulation_results(self.qnodes)
+            self.collect_results()
+            # Log.export_simulation_results(self.qnodes, output_file=self.policy)
         pass
