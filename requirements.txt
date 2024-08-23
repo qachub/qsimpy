@@ -11,4 +11,6 @@ scikit-learn==1.4.2
 scipy==1.12.0
 simpy==4.1.1
 tensorboardx==2.6.2.2
-torch
+torch==2.4.0
+pylatexenc==2.10
+qiskit-qasm3-import==0.5.0
