@@ -7,7 +7,7 @@ qiskit[visualization]==1.2.0
 qiskit-ibm-runtime==0.28.0
 ray==2.9.3
 ray[tune,air,train,rllib]
-scikit-learn==1.4.2
+scikit-learn==1.5.0
 scipy==1.12.0
 simpy==4.1.1
 tensorboardx==2.6.2.2
