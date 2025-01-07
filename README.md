@@ -36,7 +36,7 @@ We provided several quantum circuit datasets with all features extracted from th
 
 
 #### Using QSimPy with Gymnasium
-We provide example of itegrating QSimPy within Gymasium in `gymenv_qsimpy.py` file. In this example, we show how to model 5 different QNodes, using the IBM Quantum system models and use a synthetic quantum tasks dataset to simulate the continuous workload of the quantum cloud environment.
+We provide example of integrating QSimPy within Gymasium in `gymenv_qsimpy.py` file. In this example, we show how to model 5 different QNodes, using the IBM Quantum system models and use a synthetic quantum tasks dataset to simulate the continuous workload of the quantum cloud environment.
 Then, we implemented a simple Deep Q Network using [Ray Rllib](https://docs.ray.io/en/latest/rllib/index.html) with the example provided in the `ray_train_dqn.py` file. Experiment results will be saved to the `/results` folder and can be visualized using Tensorboard.
 ![Sample experiment results on Tensorboard](figures/fig07_tb.png "Sample RL Training results on Tensorboard")
 
